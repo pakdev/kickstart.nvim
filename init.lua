@@ -91,7 +91,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.opt`
@@ -166,6 +166,7 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 
 -- Diagnostic keymaps
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
+vim.keymap.set('n', ']d', vim.diagnostic.goto_next, { desc = 'Goto next diagnostic' })
 
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which
@@ -231,6 +232,65 @@ require('lazy').setup({
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
   'tpope/vim-sleuth', -- Detect tabstop and shiftwidth automatically
 
+  'github/copilot.vim', -- AI awesomeness
+
+  -- {
+  --   'folke/edgy.nvim', -- Window management
+  --   event = 'VeryLazy',
+  --   init = function()
+  --     vim.opt.laststatus = 3
+  --     vim.opt.splitkeep = 'screen'
+  --   end,
+  --   opts = {
+  --     left = {
+  --       -- Neo-tree filesystem always takes half the screen height
+  --       {
+  --         title = 'Neo-Tree',
+  --         ft = 'neo-tree',
+  --         filter = function(buf)
+  --           return vim.b[buf].neo_tree_source == 'filesystem'
+  --         end,
+  --         size = { height = 0.5 },
+  --       },
+  --       {
+  --         title = 'Neo-Tree Git',
+  --         ft = 'neo-tree',
+  --         filter = function(buf)
+  --           return vim.b[buf].neo_tree_source == 'git_status'
+  --         end,
+  --         pinned = true,
+  --         collapsed = true,
+  --         open = 'Neotree position=right git_status',
+  --       },
+  --     },
+  --     keys = {
+  --       -- Use <C-w> to navigate between windows
+  --       ['<C-w>'] = 'window',
+  --       -- Use <C-t> to navigate between tabs
+  --       ['<C-t>'] = 'tab',
+  --       -- Use <C-n> to navigate between buffers
+  --       ['<C-n>'] = 'buffer',
+  --       -- Close window
+  --       ['<leader>bd'] = function(win)
+  --         win:close()
+  --       end,
+  --       -- Next open window
+  --       ['<leader>wl'] = function(win)
+  --         win:next { visible = true, focus = true }
+  --       end,
+  --       -- Prev open window
+  --       ['<leader>wh'] = function(win)
+  --         win:prev { visible = true, focus = true }
+  --       end,
+  --     },
+  --   },
+  -- },
+
+  {
+    'mrjones2014/smart-splits.nvim',
+    config = function() end,
+  },
+
   -- NOTE: Plugins can also be added by using a table,
   -- with the first argument being the link and the following
   -- keys can be used to configure plugin behavior/loading/etc.
@@ -256,6 +316,35 @@ require('lazy').setup({
     },
   },
 
+  {
+    'folke/flash.nvim',
+    event = 'VeryLazy',
+    ---@type Flash.Config
+    opts = {},
+    -- stylua: ignore
+    keys = {
+      { "s", mode = { "n", "x", "o" }, function() require("flash").jump() end, desc = "Jump forwards" },
+      { "S", mode = { "n", "x", "o" }, function() require("flash").jump({ search = { forward = false }}) end, desc = "Jump backwards" },
+      { "<c-s>", mode = { "c" }, function() require("flash").toggle() end, desc = "Toggle Flash Search" },
+    },
+  },
+
+  {
+    'mrjones2014/legendary.nvim',
+    priority = 10000,
+    lazy = false,
+    -- The following _should_ allow legendary to load the `keys` property from other extensions
+    opts = {
+      extensions = {
+        lazy_nvim = true,
+        smart_splits = {},
+      },
+    },
+    config = function()
+      vim.keymap.set('n', '<leader>l', '<Cmd>Legendary<CR>')
+    end,
+  },
+
   -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
   --
   -- This is often very useful to both group configuration, as well as handle
@@ -270,6 +359,44 @@ require('lazy').setup({
   -- Then, because we use the `config` key, the configuration only runs
   -- after the plugin has been loaded:
   --  config = function() ... end
+
+  -- { -- Support Jupyter notebooks
+  --   'luk400/vim-jukit',
+  --   event = 'VimEnter',
+  -- },
+
+  { -- Support markdown previews
+    'iamcco/markdown-preview.nvim',
+    cmd = { 'MarkdownPreviewToggle', 'MarkdownPreview', 'MarkdownPreviewStop' },
+    ft = { 'markdown' },
+    build = function()
+      require('lazy').load { plugins = { 'markdown-preview.nvim' } }
+      vim.fn['mkdp#util#install']()
+    end,
+  },
+
+  {
+    'NeogitOrg/neogit',
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+      'sindrets/diffview.nvim',
+      'nvim-telescope/telescope.nvim',
+    },
+    config = true,
+  },
+
+  {
+    'nvim-neo-tree/neo-tree.nvim',
+    branch = 'v3.x',
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+      'nvim-tree/nvim-web-devicons',
+      'MunifTanjim/nui.nvim',
+    },
+    config = function()
+      vim.keymap.set('n', '<leader>e', '<Cmd>Neotree<CR>')
+    end,
+  },
 
   { -- Useful plugin to show you pending keybinds.
     'folke/which-key.nvim',
@@ -607,7 +734,17 @@ require('lazy').setup({
       local servers = {
         -- clangd = {},
         -- gopls = {},
-        -- pyright = {},
+        pyright = {
+          capabilities = capabilities,
+        },
+        ruff = {
+          settings = {
+            organized_imports = false,
+          },
+          on_attach = function(client)
+            client.server_capabilities.hoverProvider = false
+          end,
+        },
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
@@ -647,6 +784,11 @@ require('lazy').setup({
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
+        'pyright', -- Used for Python LSP
+        'ruff', -- linter for python (includes flake8, pep8, etc.)
+        'debugpy', -- Used for Python debugging
+        'black', -- formatter
+        'isort', -- organize imports
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
@@ -700,10 +842,11 @@ require('lazy').setup({
       formatters_by_ft = {
         lua = { 'stylua' },
         -- Conform can also run multiple formatters sequentially
-        -- python = { "isort", "black" },
+        python = { 'isort', 'black' },
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
-        -- javascript = { "prettierd", "prettier", stop_after_first = true },
+        javascript = { 'prettierd', 'prettier', stop_after_first = true },
+        markdown = { 'inject' }, -- Makes conform.nvim format python codeblocks inside markdown files
       },
     },
   },
@@ -951,6 +1094,8 @@ require('lazy').setup({
     },
   },
 })
+
+vim.g.python3_host_prog = 'C:\\Users\\peter\\.pyenv\\pyenv-win\\versions\\3.9.13\\python.exe'
 
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
